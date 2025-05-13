@@ -1,10 +1,17 @@
 import mongoose from "mongoose";
 import asyncWrapper from "../lib/asyncWrapper.js";
-import { userModel } from "../models/usersModel.js";
+import { usersModel } from "../models/usersModel.js";
+import imagekit from "../lib/imageKit.js";
 
 const createUser = asyncWrapper(async (req, res) => {
-    const { name, username, email, website, phone } = req.body;
-    if (!name || !username || !email || !website || !phone) {
+
+    const name = req && req?.body?.name;
+    const username = req && req?.body?.username;
+    const email = req && req?.body?.email;
+    const website = req && req?.body?.website;
+    const phone = req && req?.body?.phone;
+    const avatar = req && req.file
+    if (!name || !username || !email || !website || !phone || !avatar) {
         return res.status(400).json({
             success: false,
             message: "Missing Field",
@@ -22,7 +29,20 @@ const createUser = asyncWrapper(async (req, res) => {
             message: "Username Should Be equal or More Than 3 Character",
         });
     }
-    const isEmailExist = await userModel.findOne({
+    if (avatar?.size === 0) {
+        return res.status(400).json({
+            success: false,
+            message: "Image Not Valid",
+        });
+    }
+    if (!avatar?.mimetype.startsWith('image')) {
+        return res.status(400).json({
+            success: false,
+            message: "File Should Be Image",
+        });
+
+    }
+    const isEmailExist = await usersModel.findOne({
         email,
     });
     if (isEmailExist) {
@@ -31,12 +51,20 @@ const createUser = asyncWrapper(async (req, res) => {
             success: false,
         });
     }
-    const newUser = await userModel.create({
+    const imageUploaded = await imagekit.upload({
+        file: Buffer.from(avatar?.buffer),
+        useUniqueFileName: true,
+        fileName: 'user',
+        folder: 'vue_projects/users',
+    })
+    const newUser = await usersModel.create({
         name,
         username,
         email,
         phone,
         website,
+        image: imageUploaded.url,
+        imageId: imageUploaded.fileId
     });
     return res.status(201).json({
         message: "Create User Completed",
@@ -58,14 +86,17 @@ const deleteUser = asyncWrapper(async (req, res) => {
             success: false,
         });
     }
-    const userInfo = await userModel.findById(idUser);
+    const userInfo = await usersModel.findById(idUser);
     if (!userInfo) {
         return res.status(404).json({
             message: "User Is Not Exist",
             success: false,
         });
     }
-    await userModel.deleteOne({
+    if (userInfo.imageId) {
+        await imagekit.deleteFile(userInfo.imageId)
+    }
+    await usersModel.deleteOne({
         _id: userInfo._id,
     });
     return res.status(200).json({
@@ -74,7 +105,7 @@ const deleteUser = asyncWrapper(async (req, res) => {
     });
 });
 const getAllUsers = asyncWrapper(async (req, res) => {
-    const users = await userModel.find({});
+    const users = await usersModel.find({});
     if (users.length === 0) {
         return res.status(204).json({
             message: "No Users",
@@ -100,7 +131,7 @@ const getSpecificUser = asyncWrapper(async (req, res) => {
             success: false,
         });
     }
-    const userInfo = await userModel.findById(idUser);
+    const userInfo = await usersModel.findById(idUser);
     if (!userInfo) {
         return res.status(404).json({
             message: "User Is Not Exist",
@@ -114,7 +145,7 @@ const getSpecificUser = asyncWrapper(async (req, res) => {
 });
 const updateUser = asyncWrapper(async (req, res) => {
     const userId = req.params.id
-    const userInfo = await userModel.findById(userId)
+    const userInfo = await usersModel.findById(userId)
     if (!userInfo) {
         return res.status(400).json({
             message: "User Is Not Exist",
@@ -134,18 +165,18 @@ const updateUser = asyncWrapper(async (req, res) => {
             message: "Username Should Be equal or More Than 3 Character",
         });
     }
-    if (email) {        
-        const isNewEmailUsed = await userModel.find({
+    if (email) {
+        const isNewEmailUsed = await usersModel.find({
             email
         })
-        if (isNewEmailUsed.length>0) {
+        if (isNewEmailUsed.length > 0) {
             return res.status(400).json({
                 success: false,
                 message: "Email Already Used"
             })
         }
     }
-    await userModel.updateOne({
+    await usersModel.updateOne({
         _id: userId
     }, {
         name: name || userInfo.name,

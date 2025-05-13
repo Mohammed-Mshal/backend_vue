@@ -6,13 +6,22 @@ import usersRoute from './routes/usersRoute.js'
 const app = express()
 app.use(cors())
 app.use(express.json())
+app.use('/api/uploads', express.static('/uploads'))
 
-app.use('/api/users',usersRoute)
+app.use('/api/users', usersRoute)
 
-app.listen(process.env.PORT,()=>{
+app.use((error, req, res, next) => {
+    console.log(error);
+    return res.status(error.statusCode || 500).json({
+        data: null,
+        message: error.message,
+        success: false
+    })
+})
+app.listen(process.env.PORT, () => {
     console.log(`Server Listen On PORT ${process.env.PORT}`);
-    mongoose.connect(process.env.DATABASE_URL).then(()=>{
+    mongoose.connect(process.env.DATABASE_URL).then(() => {
         console.log(`Database Connected`);
-        
+
     })
 })
